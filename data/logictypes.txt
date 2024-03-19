@@ -212,8 +212,8 @@ Richness 263
 Rpm 155 The number of revolutions per minute that the device's spinning mechanism is doing
 SemiMajorAxis 248 
 Setting 12 A variable setting that can be read or written, depending on the device
-SettingInput 91 
-SettingOutput 92 
+SettingInput 91 The input setting for the device
+SettingOutput 92 The output setting for the device
 SignalID 87 Returns the contact ID of the strongest signal from this Satellite
 SignalStrength 86 Returns the degree offset of the strongest contact
 Sites 260 
