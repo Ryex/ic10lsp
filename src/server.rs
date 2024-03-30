@@ -19,8 +19,8 @@ use tower_lsp::{
         InlayHintKind, InlayHintLabel, InlayHintParams, LanguageString, Location, MarkedString,
         MessageType, NumberOrString, OneOf, ParameterInformation, ParameterLabel,
         Position as LspPosition, PositionEncodingKind, Range as LspRange, SemanticToken,
-        SemanticTokenType, SemanticTokens, SemanticTokensFullOptions, SemanticTokensLegend,
-        SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult,
+        SemanticTokenModifier, SemanticTokenType, SemanticTokens, SemanticTokensFullOptions,
+        SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult,
         SemanticTokensServerCapabilities, ServerCapabilities, ServerInfo, SignatureHelp,
         SignatureHelpOptions, SignatureHelpParams, SignatureInformation, SymbolInformation,
         SymbolKind, TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
@@ -33,7 +33,7 @@ use tree_sitter::{self as tree_sitter_rt, Node, Parser, Query, QueryCursor, Tree
 #[cfg(target_arch = "wasm32")]
 use tree_sitter_c2rust::{self as tree_sitter_rt, Node, Parser, Query, QueryCursor, Tree};
 
-use crate::instructions::{self, LOGIC_TYPE_DOCS};
+use crate::instructions;
 
 const LINT_ABSOLUTE_JUMP: &'static str = "L001";
 const LINT_NUMBER_BATCH_MODE: &'static str = "L002";
@@ -53,6 +53,10 @@ const SEMANTIC_SYMBOL_LEGEND: &'static [SemanticTokenType] = &[
     SemanticTokenType::MACRO,
     SemanticTokenType::FUNCTION,
 ];
+
+const SEMANTIC_MODIFIER_LEGEND: &'static [SemanticTokenModifier] =
+    &[SemanticTokenModifier::DEPRECATED];
+
 struct DocumentData {
     url: Url,
     content: String,
@@ -252,7 +256,7 @@ impl LanguageServer for Backend {
                             legend: {
                                 SemanticTokensLegend {
                                     token_types: SEMANTIC_SYMBOL_LEGEND.into(),
-                                    token_modifiers: vec![],
+                                    token_modifiers: SEMANTIC_MODIFIER_LEGEND.into(),
                                 }
                             },
                             ..Default::default()
@@ -548,10 +552,10 @@ impl LanguageServer for Backend {
         let query = Query::new(
             tree_sitter_ic10::language(),
             "
-
              (comment)@comment
              (instruction (operation)@keyword)
-             (logicable)@logictype
+             (logicable [(logictype)(logicslottype)(batchmode)(reagentmode)])@logictype
+             (logicable (deprecated))@deprecated
              (constant)@constant
              (device)@device
              (register)@register
@@ -570,6 +574,7 @@ impl LanguageServer for Backend {
         let comment_idx = query.capture_index_for_name("comment").unwrap();
         let keyword_idx = query.capture_index_for_name("keyword").unwrap();
         let logictype_idx = query.capture_index_for_name("logictype").unwrap();
+        let deprecated_idx = query.capture_index_for_name("deprecated").unwrap();
         let device_idx = query.capture_index_for_name("device").unwrap();
         let register_idx = query.capture_index_for_name("register").unwrap();
         let number_idx = query.capture_index_for_name("number").unwrap();
@@ -599,6 +604,8 @@ impl LanguageServer for Backend {
                     SemanticTokenType::KEYWORD
                 } else if idx == logictype_idx {
                     SemanticTokenType::TYPE
+                } else if idx == deprecated_idx {
+                    SemanticTokenType::TYPE
                 } else if idx == device_idx {
                     SemanticTokenType::STRUCT
                 } else if idx == register_idx {
@@ -622,6 +629,19 @@ impl LanguageServer for Backend {
                 }
             };
 
+            let modifiers = if idx == deprecated_idx {
+                vec![SemanticTokenModifier::DEPRECATED]
+            } else {
+                vec![]
+            };
+            let mut modifier_bit_set = 0;
+            for modifier in modifiers {
+                modifier_bit_set |= SEMANTIC_MODIFIER_LEGEND
+                    .iter()
+                    .position(|x| *x == modifier)
+                    .unwrap() as u32;
+            }
+
             ret.push(SemanticToken {
                 delta_line,
                 delta_start,
@@ -630,7 +650,7 @@ impl LanguageServer for Backend {
                     .iter()
                     .position(|x| *x == tokentype)
                     .unwrap() as u32,
-                token_modifiers_bitset: 0,
+                token_modifiers_bitset: modifier_bit_set,
             });
 
             previous_line = start.row as u32;
@@ -1309,7 +1329,7 @@ impl LanguageServer for Backend {
                     range: Some(Range::from(node.range()).into()),
                 }));
             }
-            "logictype" => {
+            "logictype" | "logicslottype" | "batchmode" | "reagentmode" | "deprecated" => {
                 let Some(instruction_node) = node.find_parent("instruction") else {
                     return Ok(None);
                 };
@@ -1384,7 +1404,10 @@ impl LanguageServer for Backend {
             }
             "enum" => {
                 if instructions::ENUMS.contains(name) {
-                    let value = instructions::ENUM_LOOKUP.get(name).unwrap();
+                    let value = instructions::ENUM_LOOKUP
+                        .get(name)
+                        .map(|val| val.to_string())
+                        .unwrap_or("Unknown".to_owned());
                     let docs = instructions::ENUM_DOCS.get(name).unwrap_or(&"");
                     return Ok(Some(Hover {
                         contents: HoverContents::Scalar(MarkedString::String(format!(
@@ -1778,7 +1801,7 @@ impl Backend {
                         "register" => instructions::Union(&[DataType::Register]),
                         "device_spec" => instructions::Union(&[DataType::Device]),
                         "number" => instructions::Union(&[DataType::Number]),
-                        "logictype" => {
+                        "logictype" | "logicslottype" | "batchmode" | "reagentmode" | "deprecated" => {
                             let ident = operand
                                 .named_child(0)
                                 .unwrap()
@@ -2196,7 +2219,8 @@ impl Backend {
         // Deprecated Logictype
         {
             let mut cursor = QueryCursor::new();
-            let query = Query::new(tree_sitter_ic10::language(), "(logictype)@lt").unwrap();
+            let query =
+                Query::new(tree_sitter_ic10::language(), "(logicable (deprecated))@lt").unwrap();
 
             let captures = cursor.captures(&query, tree.root_node(), document.content.as_bytes());
 
@@ -2205,21 +2229,17 @@ impl Backend {
 
                 let name = node.utf8_text(document.content.as_bytes()).unwrap();
 
-                if let Some(docs) = LOGIC_TYPE_DOCS.get(&name) {
-                    if docs.to_uppercase() == "DEPRECATED" {
-                        diagnostics.push(Diagnostic::new(
-                            Range::from(node.range()).into(),
-                            Some(DiagnosticSeverity::WARNING),
-                            Some(NumberOrString::String(
-                                LINT_DEPRECATED_LOGICTYPE.to_string(),
-                            )),
-                            None,
-                            format!("LogicType '{name}' is Deprecated"),
-                            None,
-                            None,
-                        ));
-                    }
-                }
+                diagnostics.push(Diagnostic::new(
+                    Range::from(node.range()).into(),
+                    Some(DiagnosticSeverity::WARNING),
+                    Some(NumberOrString::String(
+                        LINT_DEPRECATED_LOGICTYPE.to_string(),
+                    )),
+                    None,
+                    format!("LogicType '{name}' is Deprecated"),
+                    None,
+                    None,
+                ));
             }
         }
 

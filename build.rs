@@ -354,7 +354,7 @@ fn write_enums() {
     let e_contents = fs::read_to_string(e_infile).unwrap();
 
     for line in e_contents.lines().filter(|l| !l.trim().is_empty()) {
-        let mut it = line.splitn(2, ' ');
+        let mut it = line.splitn(3, ' ');
         let name = it.next().unwrap();
         let val_str = it.next().unwrap();
         let val: Option<u16> = val_str.parse().ok();
@@ -380,7 +380,7 @@ fn write_enums() {
 
     write!(
         &mut writer,
-        "pub(crate) const ENUM_LOOKUP: phf::Map<&'static str, u8> = {};\n",
+        "pub(crate) const ENUM_LOOKUP: phf::Map<&'static str, u16> = {};\n",
         enums_lookup_map_builder.build()
     )
     .unwrap();
