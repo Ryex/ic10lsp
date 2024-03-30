@@ -944,9 +944,7 @@ impl LanguageServer for Backend {
                                 label: hash_name.to_string(),
                                 text_edit: Some(CompletionTextEdit::Edit(TextEdit {
                                     range: {
-                                        let mut edit_range =
-                                            Range::from(preproc_string_node.range());
-                                        edit_range.0.end.character -= 1;
+                                        let edit_range = Range::from(preproc_string_node.range());
                                         edit_range.into()
                                     },
                                     new_text: hash_name.to_string(),
@@ -1647,44 +1645,43 @@ impl Backend {
                         }
                         let mut cursor = capture.captures[0].node.walk();
                         let value_node = capture.captures[0]
-                                .node
-                                .children_by_field_name("operand", &mut cursor)
-                                .last();
+                            .node
+                            .children_by_field_name("operand", &mut cursor)
+                            .last();
                         if let Some(value_node) = value_node {
-                                let value =
-                                    value_node.utf8_text(document.content.as_bytes()).unwrap();
-                                if capture.captures[0].index == define_idx {
-                                    if value_node
-                                        .child(0)
-                                        .map(|x| x.kind())
-                                        .map_or(false, |x| x != "number")
-                                    {
-                                        continue;
-                                    }
-                                    type_data.defines.insert(
-                                        name.to_owned(),
-                                        DefinitionData::new(
-                                            name_node.range().into(),
-                                            value.to_string(),
-                                        ),
-                                    );
-                                } else if capture.captures[0].index == alias_idx {
-                                    if value_node
-                                        .child(0)
-                                        .map(|x| x.kind())
-                                        .map_or(false, |x| x != "register" && x != "device_spec")
-                                    {
-                                        continue;
-                                    }
-                                    type_data.aliases.insert(
-                                        name.to_owned(),
-                                        DefinitionData::new(
-                                            name_node.range().into(),
-                                            value.to_owned().into(),
-                                        ),
-                                    );
+                            let value = value_node.utf8_text(document.content.as_bytes()).unwrap();
+                            if capture.captures[0].index == define_idx {
+                                if value_node
+                                    .child(0)
+                                    .map(|x| x.kind())
+                                    .map_or(false, |x| x != "number")
+                                {
+                                    continue;
                                 }
+                                type_data.defines.insert(
+                                    name.to_owned(),
+                                    DefinitionData::new(
+                                        name_node.range().into(),
+                                        value.to_string(),
+                                    ),
+                                );
+                            } else if capture.captures[0].index == alias_idx {
+                                if value_node
+                                    .child(0)
+                                    .map(|x| x.kind())
+                                    .map_or(false, |x| x != "register" && x != "device_spec")
+                                {
+                                    continue;
+                                }
+                                type_data.aliases.insert(
+                                    name.to_owned(),
+                                    DefinitionData::new(
+                                        name_node.range().into(),
+                                        value.to_owned().into(),
+                                    ),
+                                );
                             }
+                        }
                     }
                 } else if capture_idx == label_idx {
                     let name_node = capture.captures[0].node;
@@ -2195,7 +2192,7 @@ impl Backend {
                 });
             }
         }
-        
+
         // Deprecated Logictype
         {
             let mut cursor = QueryCursor::new();
