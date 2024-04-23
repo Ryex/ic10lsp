@@ -234,7 +234,7 @@
 412924554 ItemAstroloyIngot Ingot (Astroloy)
 -1662476145 ItemAstroloySheets Astroloy Sheets
 789015045 ItemAuthoringTool Authoring Tool
--1731627004 ItemAuthoringToolRocketNetwork <N:EN:ItemAuthoringToolRocketNetwork>
+-1731627004 ItemAuthoringToolRocketNetwork ItemAuthoringToolRocketNetwork
 -1262580790 ItemBasketBall Basket Ball
 700133157 ItemBatteryCell Battery Cell (Small)
 -459827268 ItemBatteryCellLarge Battery Cell (Large)
@@ -985,11 +985,11 @@
 471085864 Milk Milk
 96856935 ModularRocketCargo01 Rocket Cargo
 762107604 ModularRocketCommand01Lander Rocket Command Lander
--1667675295 MonsterEgg <N:EN:MonsterEgg>
+-1667675295 MonsterEgg MonsterEgg
 -337075633 MotherboardComms Communications Motherboard
 502555944 MotherboardLogic Logic Motherboard
 296034716 MotherboardManufacturing Manufacturing Motherboard
--127121474 MotherboardMissionControl <N:EN:MotherboardMissionControl>
+-127121474 MotherboardMissionControl MotherboardMissionControl
 -161107071 MotherboardProgrammableChip IC Editor Motherboard
 -806986392 MotherboardRockets Rocket Control Motherboard
 -1908268220 MotherboardSorter Sorter Motherboard
@@ -1095,7 +1095,7 @@
 -889269388 StructureCableCorner Cable (Corner)
 980469101 StructureCableCorner3 Cable (3-Way Corner)
 318437449 StructureCableCorner3Burnt Burnt Cable (3-Way Corner)
-2393826 StructureCableCorner3HBurnt <N:EN:StructureCableCorner3HBurnt>
+2393826 StructureCableCorner3HBurnt StructureCableCorner3HBurnt
 -1542172466 StructureCableCorner4 Cable (4-Way Corner)
 268421361 StructureCableCorner4Burnt Burnt Cable (4-Way Corner)
 -981223316 StructureCableCorner4HBurnt Burnt Heavy Cable (4-Way Corner)
@@ -1231,7 +1231,7 @@
 576516101 StructureDiodeSlide Diode Slide
 -137465079 StructureDockPortSide Dock (Port Side)
 544677628 StructureDockShipSide Dock Ship Side
-1968371847 StructureDrinkingFountain <N:EN:StructureDrinkingFountain>
+1968371847 StructureDrinkingFountain StructureDrinkingFountain
 -1027802654 StructureDuctCorner Duct Corner
 667066324 StructureDuctCrossJunction Duct Cross Junction
 -330605879 StructureDuctCrossJunction3 Duct Cross Junction3

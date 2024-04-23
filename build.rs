@@ -36,23 +36,23 @@ fn write_stationpedia() {
     let output_file = File::create(dest_path).unwrap();
     let mut writer = BufWriter::new(&output_file);
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const HASH_NAME_LOOKUP: phf::Map<&'static str, &'static str> = {};\n",
+        "pub(crate) const HASH_NAME_LOOKUP: phf::Map<&'static str, &'static str> = {};",
         name_map_builder.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const HASH_DESC_LOOKUP: phf::Map<&'static str, &'static str> = {};\n",
+        "pub(crate) const HASH_DESC_LOOKUP: phf::Map<&'static str, &'static str> = {};",
         desc_map_builder.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const HASH_NAMES: phf::Set<&'static str> = {};\n",
+        "pub(crate) const HASH_NAMES: phf::Set<&'static str> = {};",
         name_set_builder.build()
     )
     .unwrap();
@@ -89,18 +89,18 @@ fn write_instructions() {
         help_map_builder.entry(instruction, &format!("\"{}\"", help));
     }
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const INSTRUCTIONS: phf::Map<&'static str, InstructionSignature> = {};\n",
+        "pub(crate) const INSTRUCTIONS: phf::Map<&'static str, InstructionSignature> = {};",
         instruction_map_builder.build()
     )
     .unwrap();
 
     println!("cargo:rerun-if-changed=data/instructions.txt");
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const INSTRUCTION_DOCS: phf::Map<&'static str, &'static str> = {};\n",
+        "pub(crate) const INSTRUCTION_DOCS: phf::Map<&'static str, &'static str> = {};",
         help_map_builder.build()
     )
     .unwrap();
@@ -157,46 +157,46 @@ fn write_logictypes() {
         slotlogictype_help_map_builder.entry(name, &format!("\"{}\"", help));
     }
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const LOGIC_TYPES: phf::Set<&'static str> = {};\n",
+        "pub(crate) const LOGIC_TYPES: phf::Set<&'static str> = {};",
         logictype_set.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const LOGIC_TYPE_LOOKUP: phf::Map<u16, &'static str> = {};\n",
+        "pub(crate) const LOGIC_TYPE_LOOKUP: phf::Map<u16, &'static str> = {};",
         logictype_lookup_map_builder.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const LOGIC_TYPE_DOCS: phf::Map<&'static str, &'static str> = {};\n",
+        "pub(crate) const LOGIC_TYPE_DOCS: phf::Map<&'static str, &'static str> = {};",
         logictype_help_map_builder.build()
     )
     .unwrap();
 
     println!("cargo:rerun-if-changed=data/logictypes.txt");
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const SLOT_LOGIC_TYPES: phf::Set<&'static str> = {};\n",
+        "pub(crate) const SLOT_LOGIC_TYPES: phf::Set<&'static str> = {};",
         slotlogictype_set.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const SLOT_TYPE_LOOKUP: phf::Map<u16, &'static str> = {};\n",
+        "pub(crate) const SLOT_TYPE_LOOKUP: phf::Map<u16, &'static str> = {};",
         slotlogictype_lookup_map_builder.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const SLOT_TYPE_DOCS: phf::Map<&'static str, &'static str> = {};\n",
+        "pub(crate) const SLOT_TYPE_DOCS: phf::Map<&'static str, &'static str> = {};",
         slotlogictype_help_map_builder.build()
     )
     .unwrap();
@@ -252,46 +252,46 @@ fn write_modes() {
         reagentmode_help_map_builder.entry(name, &format!("\"{}\"", help));
     }
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const BATCH_MODES: phf::Set<&'static str> = {};\n",
+        "pub(crate) const BATCH_MODES: phf::Set<&'static str> = {};",
         batchmode_set.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const BATCH_MODE_LOOKUP: phf::Map<u16, &'static str> = {};\n",
+        "pub(crate) const BATCH_MODE_LOOKUP: phf::Map<u16, &'static str> = {};",
         batchmode_lookup_map_builder.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const BATCH_MODE_DOCS: phf::Map<&'static str, &'static str> = {};\n",
+        "pub(crate) const BATCH_MODE_DOCS: phf::Map<&'static str, &'static str> = {};",
         batchmode_help_map_builder.build()
     )
     .unwrap();
 
     println!("cargo:rerun-if-changed=data/batchmodes.txt");
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const REAGENT_MODES: phf::Set<&'static str> = {};\n",
+        "pub(crate) const REAGENT_MODES: phf::Set<&'static str> = {};",
         reagentmode_set.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const REAGENT_MODE_LOOKUP: phf::Map<u16, &'static str> = {};\n",
+        "pub(crate) const REAGENT_MODE_LOOKUP: phf::Map<u16, &'static str> = {};",
         reagentmode_lookup_map_builder.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const REAGENT_MODE_DOCS: phf::Map<&'static str, &'static str> = {};\n",
+        "pub(crate) const REAGENT_MODE_DOCS: phf::Map<&'static str, &'static str> = {};",
         reagentmode_help_map_builder.build()
     )
     .unwrap();
@@ -321,16 +321,16 @@ fn write_constants() {
         constants_help_map_builder.entry(name, &format!("\"{}\"", help));
     }
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const CONSTANTS: phf::Set<&'static str> = {};\n",
+        "pub(crate) const CONSTANTS: phf::Set<&'static str> = {};",
         constants_set.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const CONSTANTS_DOCS: phf::Map<&'static str, &'static str> = {};\n",
+        "pub(crate) const CONSTANTS_DOCS: phf::Map<&'static str, &'static str> = {};",
         constants_help_map_builder.build()
     )
     .unwrap();
@@ -357,7 +357,7 @@ fn write_enums() {
         let mut it = line.splitn(3, ' ');
         let name = it.next().unwrap();
         let val_str = it.next().unwrap();
-        let val: Option<u16> = val_str.parse().ok();
+        let val: Option<u32> = val_str.parse().ok();
         let help = it.next().unwrap_or("").replace("\\n", "\n");
 
         if !check_set.contains(name) {
@@ -366,28 +366,28 @@ fn write_enums() {
         }
 
         if let Some(v) = val {
-            enums_lookup_map_builder.entry(name, &format!("{}u16", v));
+            enums_lookup_map_builder.entry(name, &format!("{}u32", v));
         }
         enums_help_map_builder.entry(name, &format!("\"{}\"", help));
     }
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const ENUMS: phf::Set<&'static str> = {};\n",
+        "pub(crate) const ENUMS: phf::Set<&'static str> = {};",
         enums_set.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const ENUM_LOOKUP: phf::Map<&'static str, u16> = {};\n",
+        "pub(crate) const ENUM_LOOKUP: phf::Map<&'static str, u32> = {};",
         enums_lookup_map_builder.build()
     )
     .unwrap();
 
-    write!(
+    writeln!(
         &mut writer,
-        "pub(crate) const ENUM_DOCS: phf::Map<&'static str, &'static str> = {};\n",
+        "pub(crate) const ENUM_DOCS: phf::Map<&'static str, &'static str> = {};",
         enums_help_map_builder.build()
     )
     .unwrap();

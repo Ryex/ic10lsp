@@ -10,6 +10,18 @@ from itertools import chain
 import struct
 import binascii
 
+translation_regex = re.compile(r"<N:([A-Z]{2}):(\w+)>")
+
+def replace_translation(m: re.Match[str]) -> str:
+    match m.groups():
+        case (_code, key):
+            return key
+        case _:
+            return m.string
+
+def trans(s: str) -> str:
+    return re.sub(translation_regex, replace_translation, s)
+
 def intOrNone(val):
     try:
         return int(val)
@@ -214,7 +226,7 @@ def extract_data(install_path, data_path: Path, language: str):
         with exported_stationpedia_path.open(mode="r") as f:
             exported = json.load(f)
             for page in exported["pages"]:
-                stationpedia[page["PrefabHash"]] = (page["PrefabName"], page["Title"])
+                stationpedia[page["PrefabHash"]] = (page["PrefabName"], trans(page["Title"]))
                 
     hashables_path = Path("data") / "stationpedia.txt"
     with hashables_path.open(mode="w") as f:
