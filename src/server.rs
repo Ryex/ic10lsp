@@ -2,10 +2,7 @@ use std::{borrow::Cow, collections::HashMap, fmt::Display, net::Ipv4Addr, sync::
 
 use phf::phf_set;
 use serde_json::Value;
-use tokio::{
-    net::{TcpListener, TcpStream},
-    sync::RwLock,
-};
+use tokio::sync::RwLock;
 use tower_lsp::{
     async_trait,
     jsonrpc::Result,
@@ -34,7 +31,9 @@ use tower_lsp::{
 #[cfg(not(target_arch = "wasm32"))]
 use tree_sitter::{Node, Parser, Query, QueryCursor, StreamingIterator as _, Tree};
 #[cfg(target_arch = "wasm32")]
-use tree_sitter_c2rust::{Node, Parser, Query, QueryCursor, StreamingIterator as _, Tree};
+use tree_sitter_c2rust::{
+    self as tree_sitter, Node, Parser, Query, QueryCursor, StreamingIterator as _, Tree,
+};
 
 use crate::instructions;
 
@@ -1909,8 +1908,6 @@ impl<'a> NodeEx for Node<'a> {
             .map(|x| x.node)
     }
 }
-
-
 
 #[derive(Clone, Copy)]
 pub struct Position(pub tower_lsp::lsp_types::Position);
