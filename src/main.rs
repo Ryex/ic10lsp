@@ -1,3 +1,13 @@
+//! A language server for the IC10 MIPS-like language from the game
+//! Stationeers.
+//!
+//! [`Backend`] implements `tower_lsp`'s [`LanguageServer`] trait; each
+//! request re-derives what it needs from the current [`Tree`] rather than
+//! caching richer intermediate state, since `tree-sitter` incremental
+//! reparses are cheap and IC10 programs are small (the game caps them at a
+//! 128 lines). Static instruction/logic-type data lives in
+//! [`instructions`]; transport selection (stdio vs. TCP) lives in [`cli`].
+
 use std::{borrow::Cow, collections::HashMap, fmt::Display, net::Ipv4Addr, sync::Arc};
 
 use phf::phf_set;
@@ -36,10 +46,16 @@ use tree_sitter::{Node, Parser, Query, QueryCursor, StreamingIterator as _, Tree
 mod cli;
 mod instructions;
 
+// Diagnostic codes for lints that offer a code action. `code_action` matches
+// on these to decide which quick fix to build; keep them in sync with the
+// `match` there if you add or rename one.
 const LINT_ABSOLUTE_JUMP: &'static str = "L001";
 const LINT_NUMBER_BATCH_MODE: &'static str = "L002";
 const LINT_NUMBER_REAGENT_MODE: &'static str = "L003";
 
+/// Token kinds reported to the client, in the order `semantic_tokens_full`
+/// encodes them by index (the LSP semantic tokens wire format references
+/// types by position in this legend, not by name).
 const SEMANTIC_SYMBOL_LEGEND: &'static [SemanticTokenType] = &[
     SemanticTokenType::KEYWORD,
     SemanticTokenType::COMMENT,
@@ -49,6 +65,11 @@ const SEMANTIC_SYMBOL_LEGEND: &'static [SemanticTokenType] = &[
     SemanticTokenType::NUMBER,
     SemanticTokenType::VARIABLE,
 ];
+
+/// One open file's text and parse tree. `tree` is `None` only if parsing
+/// itself failed (not for syntax errors, which `tree-sitter` represents as
+/// `ERROR` nodes within an otherwise-present tree); handlers that need the
+/// tree bail out with an LSP error in that case.
 struct DocumentData {
     url: Url,
     content: String,
@@ -56,6 +77,9 @@ struct DocumentData {
     parser: Parser,
 }
 
+/// A `define`/`alias`/`label` name paired with the source range of its
+/// declaration, so goto-definition and duplicate-definition diagnostics can
+/// point back at it.
 #[derive(Debug)]
 struct DefinitionData<T> {
     range: Range,
@@ -68,6 +92,12 @@ impl<T> DefinitionData<T> {
     }
 }
 
+/// What an `alias` name resolves to.
+///
+/// IC10 has no separate syntax for declaring the kind of thing an alias
+/// names, so its `From<String>` impl infers it from the aliased text
+/// itself: a leading `d` means device (`d0`, `db`, ...), anything else is
+/// treated as a register.
 #[derive(Debug)]
 enum AliasValue {
     Register(String),
@@ -95,6 +125,10 @@ impl From<String> for AliasValue {
     }
 }
 
+/// Maps a definition's stored value to the [`instructions::DataType`] it
+/// satisfies, so completion and type-checking can treat `defines`,
+/// `aliases`, and `labels` uniformly against an instruction's expected
+/// operand types.
 trait HasType {
     fn get_type(&self) -> instructions::DataType;
 }
@@ -135,6 +169,9 @@ where
     }
 }
 
+/// One file's symbol table: every `define`, `alias`, and `label` currently
+/// declared in it, rebuilt from scratch on every edit by
+/// [`Backend::update_definitions`].
 #[derive(Default, Debug)]
 struct TypeData {
     defines: HashMap<String, DefinitionData<String>>,
@@ -143,6 +180,8 @@ struct TypeData {
 }
 
 impl TypeData {
+    /// The declaration range for `name`, checked across all three symbol
+    /// kinds.
     fn get_range(&self, name: &str) -> Option<Range> {
         if let Some(definition_data) = self.defines.get(name) {
             return Some(definition_data.range.clone());
@@ -157,11 +196,15 @@ impl TypeData {
     }
 }
 
+/// An open file's parsed content plus the symbol table derived from it.
 struct FileData {
     document_data: DocumentData,
     type_data: TypeData,
 }
 
+/// Server-wide settings, sent by the client via `workspace/didChangeConfiguration`
+/// and applied to every open file's diagnostics. See the `Configuration`
+/// table in the README for the client-facing key names.
 #[derive(Clone, Debug)]
 struct Configuration {
     max_lines: usize,
@@ -181,6 +224,9 @@ impl Default for Configuration {
     }
 }
 
+/// The LSP server's state, shared across concurrently-handled requests
+/// behind `RwLock`s: one entry per open file, plus the current
+/// configuration.
 struct Backend {
     client: Client,
     files: Arc<RwLock<HashMap<Url, FileData>>>,
@@ -336,6 +382,9 @@ impl LanguageServer for Backend {
         }
     }
 
+    /// Shows the Stationpedia name next to a numeric literal that matches a
+    /// known prefab/logic-type hash, e.g. annotating `2588078655` with
+    /// `LogicMemory`.
     async fn inlay_hint(&self, params: InlayHintParams) -> Result<Option<Vec<InlayHint>>> {
         let mut ret = Vec::new();
 
@@ -399,6 +448,9 @@ impl LanguageServer for Backend {
         Ok(Some(ret))
     }
 
+    /// Encodes each token's position as a delta from the previous token's
+    /// start, per the LSP semantic tokens wire format; `previous_line`/
+    /// `previous_col` carry that running position across the capture loop.
     async fn semantic_tokens_full(
         &self,
         params: SemanticTokensParams,
@@ -568,6 +620,19 @@ impl LanguageServer for Backend {
         Ok(Some(DocumentSymbolResponse::Flat(ret)))
     }
 
+    /// Suggests completions based on what the cursor is currently sitting
+    /// on:
+    ///
+    /// - An instruction name (including one that didn't parse as a known
+    ///   instruction): suggest matching instruction names.
+    /// - A blank line: also suggest instruction names, since that's what
+    ///   can legally start a new line.
+    /// - An operand: suggest values valid for that operand, based on what
+    ///   type(s) the instruction's signature expects there.
+    ///
+    /// Within an operand's suggestions, branch/jump instructions list
+    /// labels before defines/aliases, since their operand is usually a jump
+    /// target; every other instruction lists defines/aliases first.
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         fn instruction_completions(prefix: &str, completions: &mut Vec<CompletionItem>) {
             let start_entries = completions.len();
@@ -919,6 +984,11 @@ impl LanguageServer for Backend {
         }))
     }
 
+    /// Builds quick fixes for the lint diagnostics that carry a fix
+    /// (`LINT_NUMBER_BATCH_MODE`'s replacement travels in `diagnostic.data`;
+    /// `LINT_ABSOLUTE_JUMP`'s replacement is looked up by instruction name).
+    /// Diagnostics without a matching lint code, like type errors, are left
+    /// alone since there's no single correct rewrite for those.
     async fn code_action(
         &self,
         params: CodeActionParams,
@@ -1151,6 +1221,10 @@ impl LanguageServer for Backend {
 
                 let candidates = instructions::logictype_candidates(name);
 
+                // A name like "Maximum" is ambiguous on its own (both a
+                // LogicType and a BatchMode); narrow to what this operand
+                // position actually accepts so hover doesn't show docs for
+                // meanings that can't apply here.
                 let types = if let Some(signature) = instructions::INSTRUCTIONS.get(operation) {
                     if let Some(param_type) = signature.0.get(current_param) {
                         param_type.intersection(&candidates)
@@ -1189,6 +1263,8 @@ impl LanguageServer for Backend {
 }
 
 impl Backend {
+    /// The narrowest named node at `position`, or `None` if it falls
+    /// outside the tree (e.g. an empty document).
     fn node_at_position<'a>(&'a self, position: Position, tree: &'a Tree) -> Option<Node<'a>> {
         self.node_at_range(
             tower_lsp::lsp_types::Range::new(position.into(), position.into()).into(),
@@ -1205,6 +1281,10 @@ impl Backend {
         node
     }
 
+    /// Replaces a file's content with `text` and reparses it. The server
+    /// only receives full-document syncs (see `text_document_sync` in
+    /// `initialize`), so this always applies to the whole file, not a
+    /// range.
     async fn update_content(&self, uri: Url, mut text: String) {
         let mut files = self.files.write().await;
 
@@ -1236,6 +1316,12 @@ impl Backend {
         }
     }
 
+    /// Rebuilds a file's `TypeData` from its current tree: clears the
+    /// previous `defines`/`aliases`/`labels` and re-scans, emitting a
+    /// "Duplicate definition" diagnostic (pointing back at the first
+    /// declaration) for any name declared more than once. Must run before
+    /// [`Backend::check_types`], which reads the freshly-rebuilt symbol
+    /// table.
     async fn update_definitions(&self, uri: &Url, diagnostics: &mut Vec<Diagnostic>) {
         let mut files = self.files.write().await;
         let Some(file_data) = files.get_mut(uri) else {
@@ -1376,6 +1462,14 @@ impl Backend {
         }
     }
 
+    /// Type-checks every instruction against its signature in
+    /// [`instructions::INSTRUCTIONS`]: unknown mnemonics (other than
+    /// `define`/`alias`/`label`, which aren't in that table) get an
+    /// informational diagnostic, unresolvable identifiers and
+    /// operand/parameter type mismatches get errors, and a wrong argument
+    /// count gets an error naming the required count.
+    ///
+    /// Assumes [`Backend::update_definitions`] has already run for this file.
     async fn check_types(&self, uri: &Url, diagnostics: &mut Vec<Diagnostic>) {
         let files = self.files.read().await;
         let Some(file_data) = files.get(uri) else {
@@ -1551,6 +1645,13 @@ impl Backend {
         }
     }
 
+    /// Recomputes and publishes all diagnostics for a file: definitions
+    /// (and duplicates) first since type-checking depends on them, then
+    /// syntax errors, invalid instructions, type-checking, line/column
+    /// length limits, and finally the individual style lints
+    /// (`LINT_ABSOLUTE_JUMP` and friends). Called after every edit and
+    /// after configuration changes, since length limits and lint
+    /// applicability both depend on `Configuration`.
     async fn run_diagnostics(&self, uri: &Url) {
         let mut diagnostics = Vec::new();
 
@@ -1863,6 +1964,11 @@ impl Backend {
     }
 }
 
+/// Which operand index `position` (a column on the instruction's line)
+/// falls within, and that operand's node if one exists there — e.g. the
+/// cursor sitting just past a trailing space after the last operand still
+/// counts as being in the next (not-yet-written) operand slot. Used by
+/// completion and signature help to know which parameter type applies.
 fn get_current_parameter(instruction_node: Node, position: usize) -> (usize, Option<Node>) {
     let mut ret: usize = 0;
     let mut cursor = instruction_node.walk();
@@ -1881,8 +1987,16 @@ fn get_current_parameter(instruction_node: Node, position: usize) -> (usize, Opt
     (ret, operand)
 }
 
+/// Convenience queries used throughout the request handlers to navigate
+/// from a cursor's node to the syntactic context around it.
 trait NodeEx: Sized {
+    /// Walks up from this node (inclusive) to the nearest ancestor of
+    /// `kind`, or `None` if the root is reached first.
     fn find_parent(&self, kind: &str) -> Option<Self>;
+
+    /// Runs a one-off tree-sitter query rooted at this node and returns the
+    /// first capture, if any. For queries only ever expected to match once
+    /// within a small subtree; not for scanning a whole file.
     fn query<'a>(&'a self, query: &str, content: impl AsRef<[u8]>) -> Option<Node<'a>>;
 }
 
@@ -1962,13 +2076,19 @@ async fn main() {
     }
 }
 
+/// Wraps `tower_lsp`'s `Position` so `From` conversions to and from
+/// `tree_sitter::Point` can be implemented here (the orphan rule blocks
+/// implementing a foreign trait for two foreign types directly).
 #[derive(Clone, Copy)]
 struct Position(tower_lsp::lsp_types::Position);
 
+/// Wraps `tower_lsp`'s `Range` for the same reason as [`Position`], to
+/// convert to and from `tree_sitter::Range`.
 #[derive(Clone, Debug)]
 struct Range(tower_lsp::lsp_types::Range);
 
 impl Range {
+    /// Whether `position` falls within this range.
     pub fn contains(&self, position: Position) -> bool {
         let (start_line, start_char) = (self.0.start.line, self.0.start.character);
         let (end_line, end_char) = (self.0.end.line, self.0.end.character);

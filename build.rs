@@ -1,3 +1,11 @@
+//! Generates `HASH_NAME_LOOKUP` and `HASH_NAMES` from `stationpedia.txt`.
+//!
+//! `stationpedia.txt` is a `<hash> <name>` line per Stationeers prefab, dumped from the game.
+//! Baking it into `phf` maps at build time means the server can resolve a hashed item/logic-type
+//! constant to its human-readable name (used for inlay hints and hash literal completion) without
+//! parsing that file or hashing anything at runtime. The generated file is included directly into
+//! `src/instructions.rs` via `include!`.
+
 use std::{
     env,
     fs::{self, File},
